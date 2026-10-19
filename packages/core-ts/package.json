@@ -22,11 +22,11 @@
   },
   "devDependencies": {
     "@redishfish/bluewhale-spec": "workspace:*",
-    "@stellar/stellar-sdk": "^17.1.0",
-    "eslint": "^10.11.0",
-    "tsup": "^8.0.1",
+    "@stellar/stellar-sdk": "^17.2.1",
+    "eslint": "^10.12.0",
+    "tsup": "^9.0.0",
     "typescript": "^7.0.2",
-    "vitest": "^1.2.1"
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "commander": "^15.0.0"
