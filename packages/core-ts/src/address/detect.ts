@@ -1,4 +1,26 @@
 import { StrKey } from "@stellar/stellar-sdk";
+import * as crypto from "crypto";
+
+/**
+ * Constant-time byte array comparison using crypto.timingSafeEqual with portable fallback.
+ */
+export function constantTimeByteEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  if (typeof crypto !== "undefined" && typeof crypto.timingSafeEqual === "function") {
+    try {
+      return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    } catch {
+      // Fallback to constant-time loop
+    }
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a[i] ^ b[i];
+  }
+  return diff === 0;
+}
 
 const BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -70,9 +92,13 @@ export function detect(address: string): "G" | "M" | "C" | "invalid" {
       // 32-byte pubkey, 8-byte ID, and 2-byte CRC16 checksum.
       if (decoded.length === 43 && decoded[0] === 0x60) {
         const data = decoded.slice(0, decoded.length - 2);
-        const checksum =
-          decoded[decoded.length - 2] | (decoded[decoded.length - 1] << 8);
-        if (crc16(data) === checksum) {
+        const expectedCrc = crc16(data);
+        const expectedBytes = new Uint8Array([
+          expectedCrc & 0xff,
+          (expectedCrc >> 8) & 0xff,
+        ]);
+        const actualBytes = decoded.slice(decoded.length - 2);
+        if (constantTimeByteEqual(actualBytes, expectedBytes)) {
           return "M";
         }
       }
