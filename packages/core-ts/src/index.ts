@@ -15,3 +15,4 @@ export * from "./routing/safeRoutingId";
 export * from "./routing/result";
 export * from "./routing/memo";
 export * from "./routing/memoRequirement";
+export * from "./domain";
