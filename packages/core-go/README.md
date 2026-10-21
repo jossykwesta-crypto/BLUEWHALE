@@ -17,6 +17,23 @@ Part of a multi-language suite also available in **[TypeScript](https://github.c
 
 ---
 
+## Zero External Dependencies
+
+`core-go` is committed to **zero external dependencies**. Its `go.mod` must
+never declare a third-party `require` directive — only the Go standard library
+is allowed. This keeps the package auditable, supply-chain safe, and trivially
+embeddable.
+
+CI enforces this commitment on every change:
+
+- `go list -m all` must list only the module itself.
+- Any external `require` directive in `packages/core-go/go.mod` fails the build.
+
+If you need functionality that would otherwise pull in a dependency, implement
+it against the standard library instead.
+
+---
+
 ## Quick Start
 
 ```go

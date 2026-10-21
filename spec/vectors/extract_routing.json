@@ -1,0 +1,49 @@
+[
+  {
+    "description": "memo omitted entirely yields routingId: null",
+    "input": {
+      "amount": "100",
+      "asset": "XLM"
+    },
+    "expected": {
+      "routingId": null
+    },
+    "warnings": []
+  },
+  {
+    "description": "memo explicitly null yields routingId: null",
+    "input": {
+      "amount": "100",
+      "asset": "XLM",
+      "memo": null
+    },
+    "expected": {
+      "routingId": null
+    },
+    "warnings": []
+  },
+  {
+    "description": "empty string memo is treated as no memo and normalized to routingId: null without warnings",
+    "input": {
+      "amount": "100",
+      "asset": "XLM",
+      "memo": ""
+    },
+    "expected": {
+      "routingId": null
+    },
+    "warnings": []
+  },
+  {
+    "description": "non-empty memo is preserved as routingId",
+    "input": {
+      "amount": "100",
+      "asset": "XLM",
+      "memo": "12345"
+    },
+    "expected": {
+      "routingId": "12345"
+    },
+    "warnings": []
+  }
+]

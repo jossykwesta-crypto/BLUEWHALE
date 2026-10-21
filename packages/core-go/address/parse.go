@@ -12,6 +12,13 @@ import (
 // characters, a WarnNonCanonicalAddress warning carrying the original and
 // normalized strings is appended to Address.Warnings.
 func Parse(input string) (*Address, error) {
+	if len(input) > 1024 {
+		return nil, RoutingError{
+			Code:    ErrInvalidLength,
+			Input:   input[:32],
+			Message: "address input exceeds maximum allowed length of 1024 bytes",
+		}
+	}
 	kind, err := Detect(input)
 	if err != nil {
 		var code ErrorCode = ErrUnknownPrefix

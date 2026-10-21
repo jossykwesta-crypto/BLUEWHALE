@@ -11,6 +11,10 @@ Releases are coordinated with `spec/vectors.json` `spec_version`: see
 
 ### Added
 
+- `RoutingWarning.fromJson`, plus `DestinationError.toJson` / `fromJson` and
+  value equality, so every part of a `RoutingResult` round-trips on its own
+  (#228).
+
 - `WarningCode.values`, `WarningCode.isKnown` and `WarningCode.tryParse` for
   validating codes off the wire, plus the `MISSING_REQUIRED_MEMO` constant
   that `extractRouting` already emitted but `WarningCode` never declared
@@ -28,6 +32,15 @@ Releases are coordinated with `spec/vectors.json` `spec_version`: see
   (#72).
 
 ### Fixed
+
+- `RoutingResult.fromJson` accepts any `Map` with string keys. Hive returns
+  `Map<dynamic, dynamic>` for stored maps, and the nested `is Map<String,
+  dynamic>` checks silently dropped every warning and the `destinationError`
+  from such input (#228).
+- `RoutingResult` equality now compares the `destinationError` message, not
+  only its code.
+- The library compiles again: `extractRouting` (the synchronous entry point)
+  had been dropped in a merge while `extractRoutingAsync` still called it.
 
 - **Breaking for consumers matching on warning codes:** a `hash`/`return` memo
   and an unrecognized memo type now emit `UNSUPPORTED_MEMO_TYPE` with

@@ -23,12 +23,29 @@ type URIParams struct {
 
 var (
 	// ErrInvalidScheme indicates that the URI does not start with web+stellar:.
-	ErrInvalidScheme = errors.New("URI must use 'web+stellar:' scheme")
+	// It also matches corego.ErrUnsupportedScheme under errors.Is.
+	ErrInvalidScheme error = schemeError{}
 	// ErrUnsupportedOperation indicates an operation other than 'pay'.
 	ErrUnsupportedOperation = errors.New("unsupported operation: only 'pay' is supported")
 	// ErrMissingDestination indicates that the destination parameter is absent or empty.
 	ErrMissingDestination = errors.New("missing required 'destination' parameter")
 )
+
+// schemeError is the concrete type behind ErrInvalidScheme. It is a comparable
+// value, so existing `err == ErrInvalidScheme` checks keep working.
+type schemeError struct{}
+
+func (schemeError) Error() string { return "URI must use 'web+stellar:' scheme" }
+
+// ErrorCode returns the code the core-go sentinels match on.
+func (schemeError) ErrorCode() string { return "UNSUPPORTED_SCHEME" }
+
+// Is matches any error exposing the same code through ErrorCode(), such as
+// corego.ErrUnsupportedScheme.
+func (e schemeError) Is(target error) bool {
+	t, ok := target.(interface{ ErrorCode() string })
+	return ok && t.ErrorCode() == e.ErrorCode()
+}
 
 // mapSep7MemoType maps SEP-0007 memo_type strings to internal RoutingInput memoType values.
 func mapSep7MemoType(sep7MemoType string) string {

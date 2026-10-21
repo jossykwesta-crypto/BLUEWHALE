@@ -59,3 +59,29 @@ export interface ExtractOptions {
    */
   incomingMemo?: string;
 }
+
+/**
+ * Options accepted by the async SEP-0029 routing extraction.
+ */
+export interface ExtractRoutingAsyncOptions {
+  /**
+   * A raw Stellar address – either a plain G-address or a muxed M-address.
+   */
+  address: string;
+
+  /**
+   * An optional memo that arrived alongside the payment instruction
+   * (e.g. from a transaction memo field or a payment URI parameter).
+   *
+   * When the `address` is an M-address, this field is **ignored** and a
+   * `"memo-ignored"` warning is added to the result.
+   */
+  incomingMemo?: string;
+
+  /**
+   * An optional `AbortSignal` used to cancel the in-flight `stellar.toml`
+   * HTTP request. When aborted, the returned promise rejects with a
+   * descriptive cancellation error.
+   */
+  signal?: AbortSignal;
+}

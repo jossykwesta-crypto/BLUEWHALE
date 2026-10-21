@@ -74,4 +74,51 @@ void main() {
       expect(result.raw, equals(validContractAddress));
     });
   });
+
+  group('parse lowercase addresses', () {
+    test('emits nonCanonicalAddress warning for lowercase G address', () {
+      const canonical =
+          'GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI';
+      final result = parse(canonical.toLowerCase());
+      expect(result.kind, equals(AddressKind.g));
+      expect(result.address, equals(canonical));
+      expect(result.warnings.length, equals(1));
+      expect(
+          result.warnings.first.code, equals(WarningCode.nonCanonicalAddress));
+      expect(result.warnings.first.normalization?.original,
+          equals(canonical.toLowerCase()));
+      expect(result.warnings.first.normalization?.normalized,
+          equals(canonical));
+    });
+
+    test('emits nonCanonicalAddress warning for lowercase M address', () {
+      const canonical =
+          'MAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQACAAAAAAAAAAAAD672';
+      final result = parse(canonical.toLowerCase());
+      expect(result.kind, equals(AddressKind.m));
+      expect(result.address, equals(canonical));
+      expect(result.warnings.length, equals(1));
+      expect(
+          result.warnings.first.code, equals(WarningCode.nonCanonicalAddress));
+      expect(result.warnings.first.normalization?.original,
+          equals(canonical.toLowerCase()));
+      expect(result.warnings.first.normalization?.normalized,
+          equals(canonical));
+    });
+
+    test('emits nonCanonicalAddress warning for lowercase C address', () {
+      const canonical =
+          'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4';
+      final result = parse(canonical.toLowerCase());
+      expect(result.kind, equals(AddressKind.c));
+      expect(result.address, equals(canonical));
+      expect(result.warnings.length, equals(1));
+      expect(
+          result.warnings.first.code, equals(WarningCode.nonCanonicalAddress));
+      expect(result.warnings.first.normalization?.original,
+          equals(canonical.toLowerCase()));
+      expect(result.warnings.first.normalization?.normalized,
+          equals(canonical));
+    });
+  });
 }

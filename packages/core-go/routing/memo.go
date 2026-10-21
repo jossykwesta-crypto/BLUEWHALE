@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/REDISHFISH/BLUEWHALE/packages/core-go/address"
@@ -8,6 +9,12 @@ import (
 
 // uint64MaxStr is the decimal string representation of math.MaxUint64.
 const uint64MaxStr = "18446744073709551615"
+
+// maxMemoTextBytes is the maximum byte length allowed for a MEMO_TEXT value.
+const maxMemoTextBytes = 28
+
+// ErrMemoTooLong is returned when a memo string exceeds the 28-byte MEMO_TEXT limit.
+var ErrMemoTooLong = errors.New("memo text exceeds 28 bytes")
 
 type NormalizeResult struct {
 	Normalized string
@@ -38,6 +45,16 @@ func fitsUint64(s string) bool {
 		return false
 	}
 	return s <= uint64MaxStr
+}
+
+// NormalizeMemoText validates and normalizes a MEMO_TEXT value. It enforces the
+// strict 28-byte limit (counting UTF-8 bytes via len(s), not runes) before any
+// numeric parsing is attempted, returning ErrMemoTooLong for oversized inputs.
+func NormalizeMemoText(s string) (string, error) {
+	if len(s) > maxMemoTextBytes {
+		return "", ErrMemoTooLong
+	}
+	return s, nil
 }
 
 func NormalizeMemoTextID(s string) NormalizeResult {

@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -307,5 +308,148 @@ func TestDestinationErrorOmitsEmptyFields(t *testing.T) {
 				t.Errorf("destinationError.message present = %v, want %v (json: %s)", ok, tt.wantMessage, encoded)
 			}
 		})
+	}
+}
+
+// ─── MarshalBinary / UnmarshalBinary ───────────────────────────────────────────
+//
+// Binary serialization is used for efficient caching (Redis, BoltDB) and gRPC
+// transport.  The round-trip must preserve every field, including the optional
+// DestinationError pointer and the RoutingID.
+
+func TestRoutingResultBinaryRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	original := RoutingResult{
+		Success:                true,
+		DestinationBaseAccount: "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLT7AV7Y6S33Z6S3CHBAAAAAAAAAAAAABQD2",
+		RoutingID:              NewRoutingID("18446744073709551615"),
+		RoutingSource:          "muxed",
+		DestinationError: &DestinationError{
+			Code:    address.ErrUnknownPrefix,
+			Message: "unrecognised destination prefix",
+		},
+	}
+
+	encoded, err := original.MarshalBinary()
+	if err != nil {
+		t.Fatalf("MarshalBinary() error = %v", err)
+	}
+
+	var decoded RoutingResult
+	if err := decoded.UnmarshalBinary(encoded); err != nil {
+		t.Fatalf("UnmarshalBinary() error = %v", err)
+	}
+
+	if decoded.Success != original.Success {
+		t.Errorf("Success = %v, want %v", decoded.Success, original.Success)
+	}
+	if decoded.DestinationBaseAccount != original.DestinationBaseAccount {
+		t.Errorf("DestinationBaseAccount = %q, want %q", decoded.DestinationBaseAccount, original.DestinationBaseAccount)
+	}
+	if decoded.RoutingSource != original.RoutingSource {
+		t.Errorf("RoutingSource = %q, want %q", decoded.RoutingSource, original.RoutingSource)
+	}
+	if decoded.RoutingID == nil {
+		t.Fatal("decoded RoutingID is nil")
+	}
+	if decoded.RoutingID.String() != original.RoutingID.String() {
+		t.Errorf("RoutingID = %q, want %q", decoded.RoutingID.String(), original.RoutingID.String())
+	}
+	if decoded.DestinationError == nil {
+		t.Fatal("decoded DestinationError is nil")
+	}
+	if decoded.DestinationError.Code != original.DestinationError.Code {
+		t.Errorf("DestinationError.Code = %v, want %v", decoded.DestinationError.Code, original.DestinationError.Code)
+	}
+	if decoded.DestinationError.Message != original.DestinationError.Message {
+		t.Errorf("DestinationError.Message = %q, want %q", decoded.DestinationError.Message, original.DestinationError.Message)
+	}
+}
+
+func TestRoutingResultBinaryRoundtripEmpty(t *testing.T) {
+	t.Parallel()
+
+	original := RoutingResult{}
+
+	encoded, err := original.MarshalBinary()
+	if err != nil {
+		t.Fatalf("MarshalBinary() error = %v", err)
+	}
+
+	var decoded RoutingResult
+	if err := decoded.UnmarshalBinary(encoded); err != nil {
+		t.Fatalf("UnmarshalBinary() error = %v", err)
+	}
+
+	if decoded.Success != false {
+		t.Errorf("Success = %v, want false", decoded.Success)
+	}
+	if decoded.DestinationBaseAccount != "" {
+		t.Errorf("DestinationBaseAccount = %q, want empty", decoded.DestinationBaseAccount)
+	}
+	if decoded.RoutingID != nil {
+		t.Errorf("RoutingID = %v, want nil", decoded.RoutingID)
+	}
+	if decoded.RoutingSource != "" {
+		t.Errorf("RoutingSource = %q, want empty", decoded.RoutingSource)
+	}
+	if decoded.DestinationError != nil {
+		t.Errorf("DestinationError = %v, want nil", decoded.DestinationError)
+	}
+}
+
+func TestRoutingResultUnmarshalBinaryRejectsTruncatedInput(t *testing.T) {
+	t.Parallel()
+
+	original := RoutingResult{
+		Success:                true,
+		DestinationBaseAccount: "GABC",
+		RoutingID:              NewRoutingID("12345"),
+		RoutingSource:          "memo",
+	}
+
+	encoded, err := original.MarshalBinary()
+	if err != nil {
+		t.Fatalf("MarshalBinary() error = %v", err)
+	}
+
+	// Every strict prefix of a valid encoding must be rejected rather than
+	// silently producing a partially-populated result.
+	for i := 0; i < len(encoded); i++ {
+		var decoded RoutingResult
+		if err := decoded.UnmarshalBinary(encoded[:i]); err == nil {
+			t.Errorf("UnmarshalBinary(truncated to %d bytes) error = nil, want non-nil", i)
+		}
+	}
+}
+
+func TestRoutingResultBinaryRoundtripIsStable(t *testing.T) {
+	t.Parallel()
+
+	original := RoutingResult{
+		Success:                true,
+		DestinationBaseAccount: "GABC",
+		RoutingID:              NewRoutingID("9007199254740993"),
+		RoutingSource:          "memo",
+	}
+
+	first, err := original.MarshalBinary()
+	if err != nil {
+		t.Fatalf("MarshalBinary() error = %v", err)
+	}
+
+	var decoded RoutingResult
+	if err := decoded.UnmarshalBinary(first); err != nil {
+		t.Fatalf("UnmarshalBinary() error = %v", err)
+	}
+
+	second, err := decoded.MarshalBinary()
+	if err != nil {
+		t.Fatalf("MarshalBinary() error = %v", err)
+	}
+
+	if !bytes.Equal(first, second) {
+		t.Errorf("re-encoded bytes differ:\n first = %x\nsecond = %x", first, second)
 	}
 }

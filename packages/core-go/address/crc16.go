@@ -37,12 +37,28 @@ var crc16Table = [256]uint16{
 }
 
 // CalculateCRC16 computes the CRC-16 XModem checksum for the given data.
+//
+// The main loop is unrolled to eight bytes per iteration, which removes most
+// of the loop-control and bounds-check overhead of a byte-at-a-time loop on
+// the 35- and 43-byte buffers every strkey validation checks. The table is
+// indexed by a byte, so those lookups need no bounds check either. The result
+// is identical to the byte-at-a-time definition for every input.
 func CalculateCRC16(data []byte) uint16 {
 	crc := uint16(0)
+	for len(data) >= 8 {
+		_ = data[7] // one bounds check for the eight reads below
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[0]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[1]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[2]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[3]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[4]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[5]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[6]]
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^data[7]]
+		data = data[8:]
+	}
 	for _, b := range data {
-		lookupIndex := (crc >> 8) ^ uint16(b)
-		crc = (crc << 8) ^ crc16Table[lookupIndex]
-		crc &= 0xffff
+		crc = crc<<8 ^ crc16Table[byte(crc>>8)^b]
 	}
 	return crc
 }
