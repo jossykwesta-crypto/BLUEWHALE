@@ -35,6 +35,43 @@ if (!result.destinationError) {
 }
 ```
 
+## Bun and Deno
+
+The package ships explicit `bun` and `deno` export conditions, both pointing
+at the ESM build, so no extra configuration is needed.
+
+```bash
+# Bun
+bun add @redishfish/bluewhale-core @stellar/stellar-sdk
+
+# Deno (2.x)
+deno add npm:@redishfish/bluewhale-core npm:@stellar/stellar-sdk
+```
+
+```typescript
+// Bun: plain package import
+import { extractRouting } from '@redishfish/bluewhale-core';
+
+// Deno: npm specifier (or the bare name once added with `deno add`)
+import { extractRouting } from 'npm:@redishfish/bluewhale-core';
+```
+
+`@stellar/stellar-sdk` is a peer dependency and must be installed alongside.
+To run the runtime smoke tests from a checkout, build first:
+
+```bash
+pnpm --filter @redishfish/bluewhale-core build
+pnpm --filter @redishfish/bluewhale-core test:bun
+pnpm --filter @redishfish/bluewhale-core test:deno
+```
+
+## Tree-shaking
+
+`package.json` declares `"sideEffects": false`, so bundlers (webpack, Rollup,
+esbuild, Vite, Next.js) drop every module you do not import. Importing only
+`extractRouting` stays under 5 KB gzipped (excluding the
+`@stellar/stellar-sdk` peer); `src/test/bundle-size.test.ts` enforces this.
+
 ## Documentation
 
 For full guides, integration examples, and deep dives into the routing logic, see our [comprehensive Guides](https://github.com/REDISHFISH/BLUEWHALE/tree/main/docs/guides).

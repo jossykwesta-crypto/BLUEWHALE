@@ -1,103 +1,69 @@
----
-title: "extractRouting"
-description: "The primary API for deposit routing."
----
+# extract_routing
 
-`extractRouting` is the core function of the library. It reconciles an address and memo into a canonical routing result.
+Extracts routing information from a memo string.
 
-## Function Signatures
+## Request
 
-<CodeGroup>
-```typescript TypeScript
-function extractRouting(input: RoutingInput): RoutingResult
-```
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `memo` | `string \| null` | No | Memo string to parse for routing information. |
 
-```go Go
-func ExtractRouting(input RoutingInput) RoutingResult
-```
+### Memo value semantics
 
-```dart Dart
-RoutingResult extractRouting(RoutingInput input)
-```
-</CodeGroup>
+The `memo` field distinguishes between three cases:
 
-## Input: `RoutingInput`
+| Value | Meaning | Result |
+| --- | --- | --- |
+| `memo: ""` | Empty string — treated as no memo. | Normalized cleanly; `routingId` is `null` with no warnings. |
+| `memo: null` | Explicitly no memo. | `routingId` is `null`. |
+| `memo` omitted | Field not provided. | `routingId` is `null`. |
 
-| Field | Type | Description |
-|---|---|---|
-| `address` | `string` | The destination address (G, M, or C). |
-| `memoType` | `string` | (Optional) `ID`, `TEXT`, `HASH`, or `RETURN`. |
-| `memoValue` | `string` | (Optional) The raw memo value. |
-| `minSeverityLevel` | `string` | (Optional) Filter warnings by minimum severity. See below. |
+An empty string `""` is never treated as a validation error; it is normalized to the same result as `null` or an omitted `memo`.
 
-## Output: `RoutingResult`
+## Response
 
 | Field | Type | Description |
-|---|---|---|
-| `address` | `string` | The canonical base G-address. |
-| `routingId` | `string` | The extracted 64-bit ID (or empty string). |
-| `warnings` | `Warning[]` | List of warnings encountered (filtered by `minSeverityLevel` if provided). |
-| `destinationError` | `string` | Error code if the destination is invalid. |
+| --- | --- | --- |
+| `routingId` | `string \| null` | Extracted routing identifier, or `null` when no memo is present. |
 
-## Option: `minSeverityLevel`
+## Examples
 
-The `minSeverityLevel` option was added in **v1.1.0** to let integrators suppress low-priority warnings that are not actionable in their environment. When set, the returned `warnings` array will only include warnings whose `severity` is greater than or equal to the specified level.
+### Empty memo
 
-### Severity Hierarchy
-
-```
-INFO  <  WARN  <  ERROR
+```json
+{
+  "memo": ""
+}
 ```
 
-### Values
-
-| Value | Warnings returned |
-|---|---|
-| `"INFO"` (default) | All warnings (`INFO`, `WARN`, `ERROR`). |
-| `"WARN"` | Only `WARN` and `ERROR` warnings. |
-| `"ERROR"` | Only `ERROR` warnings. |
-
-### Example
-
-```typescript
-import { extractRouting } from '@redishfish/bluewhale-core';
-
-// Suppress INFO-level warnings in production to reduce noise
-const result = extractRouting({
-  address: "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLT7AV7Y6S33Z6S3CHBAAAAAAAAAAAAABQD",
-  memoType: "ID",
-  memoValue: "123",
-  minSeverityLevel: "WARN",
-});
-
-// REDUNDANT_MEMO (INFO) is suppressed; only WARN and ERROR warnings appear
-console.log(result.warnings); // []
+```json
+{
+  "routingId": null
+}
 ```
 
-<Info>
-  `minSeverityLevel` filters the **returned** warnings only. All warnings are still evaluated internally, so setting this option does not change the routing result — it only affects what is surfaced to your application code.
-</Info>
+### Null memo
 
-### Go and Dart
-
-The option is available in the same position in all three implementations:
-
-<CodeGroup>
-```go Go
-result := routing.ExtractRouting(routing.RoutingInput{
-    Address:          "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLT7AV7Y6S33Z6S3CHBAAAAAAAAAAAAABQD",
-    MemoType:         "ID",
-    MemoValue:        "123",
-    MinSeverityLevel: "WARN",
-})
+```json
+{
+  "memo": null
+}
 ```
 
-```dart Dart
-final result = extractRouting(RoutingInput(
-  address: "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLT7AV7Y6S33Z6S3CHBAAAAAAAAAAAAABQD",
-  memoType: "ID",
-  memoValue: "123",
-  minSeverityLevel: "WARN",
-));
+```json
+{
+  "routingId": null
+}
 ```
-</CodeGroup>
+
+### Omitted memo
+
+```json
+{}
+```
+
+```json
+{
+  "routingId": null
+}
+```

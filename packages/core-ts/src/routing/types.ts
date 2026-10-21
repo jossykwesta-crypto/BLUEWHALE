@@ -28,6 +28,19 @@ export type RoutingResult = {
     code: ErrorCode;
     message: string;
   };
+  /**
+   * Present on results returned by `extractRouting` (and the helpers built on
+   * it). Makes `JSON.stringify(result)` safe: `routingId` is serialized as a
+   * decimal string, so a `bigint` never throws and IDs above 2^53 - 1 keep
+   * their precision. Non-enumerable, so it is invisible to object spread and
+   * deep equality. Use `stringifyRoutingResult` for results built by hand.
+   */
+  toJSON?: () => SerializedRoutingResult;
+};
+
+/** The JSON form of a RoutingResult: `routingId` is a decimal string. */
+export type SerializedRoutingResult = Omit<RoutingResult, "routingId" | "toJSON"> & {
+  routingId: string | null;
 };
 
 export type MemoRequirementFetcher = (baseAccount: string) => Promise<boolean>;

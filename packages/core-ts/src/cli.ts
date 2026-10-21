@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { extractRouting } from "./routing/extract";
+import { stringifyRoutingResult } from "./routing/result";
 import type { RoutingInput } from "./routing/types";
 
 const program = new Command();
@@ -26,13 +27,7 @@ const input: RoutingInput = {
 
 try {
   const result = extractRouting(input);
-  console.log(
-    JSON.stringify(
-      result,
-      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
-      2
-    )
-  );
+  console.log(stringifyRoutingResult(result, 2));
 } catch (error) {
   if (error instanceof Error) {
     console.error(`Error: ${error.message}`);

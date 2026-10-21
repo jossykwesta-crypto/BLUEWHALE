@@ -1,6 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
   "definitions": {
+    "routingId": {
+      "type": "string",
+      "pattern": "^[0-9]{1,20}$",
+      "maxUint64": true
+    },
     "warningNormalization": {
       "type": "object",
       "required": ["code", "severity", "message", "normalization"],
@@ -56,6 +61,25 @@
         }
       }
     },
+    "warningMemoTextTooLong": {
+      "type": "object",
+      "required": ["code", "severity", "message", "context"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string", "const": "MEMO_TEXT_TOO_LONG" },
+        "severity": { "type": "string", "const": "error" },
+        "message": { "type": "string" },
+        "context": {
+          "type": "object",
+          "required": ["byteLength", "maxByteLength"],
+          "additionalProperties": false,
+          "properties": {
+            "byteLength": { "type": "integer", "minimum": 0 },
+            "maxByteLength": { "type": "integer", "const": 28 }
+          }
+        }
+      }
+    },
     "warningGeneric": {
       "type": "object",
       "required": ["code", "severity", "message"],
@@ -78,8 +102,10 @@
       "type": "string",
       "enum": [
         "INVALID_CHECKSUM", "INVALID_LENGTH", "INVALID_BASE32",
+        "INVALID_STRKEY_LENGTH",
         "UNKNOWN_PREFIX", "REJECTED_SEED_KEY", "REJECTED_PREAUTH",
-        "REJECTED_HASH_X", "FEDERATION_ADDRESS_NOT_SUPPORTED"
+        "REJECTED_HASH_X", "FEDERATION_ADDRESS_NOT_SUPPORTED",
+        "INVALID_DOMAIN_NAME"
       ]
     },
     "destinationError": {
@@ -90,13 +116,24 @@
         "message": { "type": "string" }
       }
     },
+    "domainName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"
+    },
     "warning": {
       "oneOf": [
         { "$ref": "#/definitions/warningNormalization" },
         { "$ref": "#/definitions/warningInvalidDestination" },
         { "$ref": "#/definitions/warningUnsupportedMemoType" },
+        { "$ref": "#/definitions/warningMemoTextTooLong" },
         { "$ref": "#/definitions/warningGeneric" }
       ]
+    },
+    "addressKind": {
+      "type": "string",
+      "enum": ["KindG", "KindC", "KindM", "KindUnknown"]
     }
   },
   "type": "object",
@@ -111,13 +148,28 @@
         "properties": {
           "module": {
             "type": "string",
-            "enum": ["detect", "muxed_encode", "muxed_decode", "extract_routing", "extract_from_uri"]
+            "enum": ["detect", "muxed_encode", "muxed_decode", "extract_routing", "extract_from_uri", "toml_lookup"]
           },
           "description": { "type": "string" },
-          "input": { "type": "object" },
+          "input": {
+            "type": "object",
+            "properties": {
+              "routingId": { "$ref": "#/definitions/routingId" },
+              "memo": {
+                "type": "object",
+                "required": ["type", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "type": "string", "enum": ["text", "id", "hash", "return"] },
+                  "value": { "type": "string" }
+                }
+              }
+            }
+          },
           "expected": {
             "type": "object",
             "properties": {
+              "kind": { "$ref": "#/definitions/addressKind" },
               "warnings": {
                 "type": "array",
                 "items": { "$ref": "#/definitions/warning" }

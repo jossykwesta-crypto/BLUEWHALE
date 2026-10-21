@@ -2,6 +2,9 @@ package routing
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -255,3 +258,25 @@ func ExtractRoutingWithMemoRequirement(input RoutingInput, fetch MemoRequirement
 func stringValue(s string) string {
 	return s
 }
+
+// ValidateHostAntiSSRF validates that host / IP is not a loopback, private or link-local address
+// to protect against Server-Side Request Forgery (SSRF) when resolving stellar.toml (Issue #212).
+func ValidateHostAntiSSRF(hostOrIP string) error {
+	ip := net.ParseIP(hostOrIP)
+	if ip == nil {
+		ips, err := net.LookupIP(hostOrIP)
+		if err != nil {
+			return err
+		}
+		if len(ips) == 0 {
+			return errors.New("no IP addresses resolved for host")
+		}
+		ip = ips[0]
+	}
+
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return fmt.Errorf("SSRF protection: prohibited address %s", ip.String())
+	}
+	return nil
+}
+

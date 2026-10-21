@@ -141,10 +141,10 @@ void main() {
     });
   });
 
-  group('extractRouting (async)', () {
+  group('extractRoutingAsync', () {
     test('decodes muxed routing when no external memo is present', () async {
       await expectLater(
-        extractRouting(RoutingInput(destination: muxedAddress, memoType: 'none')),
+        extractRoutingAsync(RoutingInput(destination: muxedAddress, memoType: 'none')),
         completion(predicate((RoutingResult result) =>
             result.destinationBaseAccount == baseG &&
             result.id == BigInt.parse('9007199254740993') &&
@@ -156,7 +156,7 @@ void main() {
 
     test('prefers external memo over muxed routing and emits memo-ignored warning', () async {
       await expectLater(
-        extractRouting(RoutingInput(
+        extractRoutingAsync(RoutingInput(
           destination: muxedAddress,
           memoType: 'id',
           memoValue: '42',
@@ -173,7 +173,7 @@ void main() {
 
     test('keeps muxed decode valid when external memo is unroutable', () async {
       await expectLater(
-        extractRouting(RoutingInput(
+        extractRoutingAsync(RoutingInput(
           destination: muxedAddress,
           memoType: 'text',
           memoValue: 'not-a-routing-id',
@@ -191,7 +191,7 @@ void main() {
 
     test('preserves existing non-muxed memo routing behavior', () async {
       await expectLater(
-        extractRouting(RoutingInput(
+        extractRoutingAsync(RoutingInput(
           destination: baseG,
           memoType: 'id',
           memoValue: '100',

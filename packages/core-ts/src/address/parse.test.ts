@@ -225,7 +225,27 @@ describe("parse", () => {
 
     it("should throw AddressParseError for string with correct length but wrong prefix", () => {
       expect(() => parse("X".repeat(56))).toThrowError(AddressParseError);
+    });
 
+    it("should throw AddressParseError when input exceeds 1024 bytes", () => {
+      const hugeInput = "G" + "A".repeat(1025);
+      expect(() => parse(hugeInput)).toThrowError(AddressParseError);
+      try {
+        parse(hugeInput);
+      } catch (err: any) {
+        expect(err.code).toBe("MAX_INPUT_EXCEEDED");
+      }
+    });
+
+    it("should sanitize ANSI escape sequences and control characters in error messages", () => {
+      const evilInput = "\x1b[31mEvil\x1b[0m\x00Payload";
+      try {
+        parse(evilInput);
+      } catch (err: any) {
+        expect(err.message).not.toContain("\x1b[31m");
+        expect(err.message).not.toContain("\x00");
+      }
     });
   });
 });
+

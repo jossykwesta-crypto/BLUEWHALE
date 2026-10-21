@@ -60,3 +60,6 @@ Thumbs.db
 
 # ─── Fuzzer findings ─────────────────────────────────────────────────────────
 examples/rust-address-fuzzer/findings/
+
+# ─── Test coverage ───────────────────────────────────────────────────────────
+coverage/

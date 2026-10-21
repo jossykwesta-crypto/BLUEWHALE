@@ -1,0 +1,13 @@
+rules:
+  - id: bluewhale-no-unsanitized-terminal-escape
+    patterns:
+      - pattern: console.error($MSG)
+    message: "Ensure user-supplied address strings are sanitized against ANSI escape injection before logging."
+    languages: [typescript, javascript]
+    severity: WARNING
+    metadata:
+      category: security
+      owasp:
+        - "A03:2021 - Injection"
+      cwe:
+        - "CWE-117: Improper Output Neutralization for Logs"

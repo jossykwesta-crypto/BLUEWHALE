@@ -98,9 +98,8 @@ func decodeStrKey(address string) (versionByte byte, payload []byte, canonical s
 	}
 
 	crc := CalculateCRC16(decoded[:n-2])
-	expected := []byte{byte(crc), byte(crc >> 8)}
-	actual := []byte{decoded[n-2], decoded[n-1]}
-	if subtle.ConstantTimeCompare(expected, actual) != 1 {
+	expectedChecksum := [2]byte{byte(crc), byte(crc >> 8)}
+	if subtle.ConstantTimeCompare(decoded[n-2:], expectedChecksum[:]) != 1 {
 		return 0, nil, "", errInvalidChecksum
 	}
 
