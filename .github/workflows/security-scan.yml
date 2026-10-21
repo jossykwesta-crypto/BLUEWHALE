@@ -10,14 +10,31 @@ on:
       - 'pnpm-lock.yaml'
       - 'packages/core-go/go.mod'
       - 'packages/core-go/go.sum'
+      - 'packages/core-dart/pubspec.yaml'
+      - 'packages/core-dart/pubspec.lock'
       - 'examples/prism-core/Cargo.toml'
       - 'examples/rust-address-fuzzer/Cargo.toml'
+      - '.github/workflows/security-scan.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  secret-scan:
+    name: gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
   audit-npm:
     name: npm audit (pnpm)
     runs-on: ubuntu-latest
@@ -55,6 +72,20 @@ jobs:
       - name: Run govulncheck
         run: govulncheck ./...
         working-directory: packages/core-go
+
+  audit-dart:
+    name: dart dependency audit (core-dart)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Check package dependencies
+        run: dart pub get
+        working-directory: packages/core-dart
 
   audit-rust-prism:
     name: cargo audit (prism-core)
@@ -120,8 +151,10 @@ jobs:
     steps:
       - name: Enforce all audits passed
         if: >
+          needs.secret-scan.result != 'success' ||
           needs.audit-npm.result != 'success' ||
           needs.audit-go.result != 'success' ||
+          needs.audit-dart.result != 'success' ||
           needs.audit-rust-prism.result != 'success' ||
           needs.audit-rust-fuzzer.result != 'success' ||
           needs.semgrep-scan.result != 'success' ||
@@ -130,6 +163,7 @@ jobs:
           echo "::error::Security scan failed — at least one audit or static analysis failed."
           echo "::error::npm audit:          ${{ needs.audit-npm.result }}"
           echo "::error::govulncheck go:     ${{ needs.audit-go.result }}"
+          echo "::error::dart audit:         ${{ needs.audit-dart.result }}"
           echo "::error::cargo audit prism:  ${{ needs.audit-rust-prism.result }}"
           echo "::error::cargo audit fuzzer: ${{ needs.audit-rust-fuzzer.result }}"
           echo "::error::semgrep:            ${{ needs.semgrep-scan.result }}"
