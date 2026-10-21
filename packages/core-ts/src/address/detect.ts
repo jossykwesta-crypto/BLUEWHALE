@@ -68,11 +68,19 @@ export function detect(address: string): "G" | "M" | "C" | "invalid" {
       const decoded = decodeBase32(up);
       // M-addresses (SEP-23) payload consists of 1 version byte (0x60),
       // 32-byte pubkey, 8-byte ID, and 2-byte CRC16 checksum.
+/**
+ * Constant-time comparison of two 16-bit integers to mitigate timing attacks (Issue #290).
+ */
+export function constantTimeEqual16(a: number, b: number): boolean {
+  const diff = a ^ b;
+  return ((diff | -diff) >>> 31) === 0;
+}
+
       if (decoded.length === 43 && decoded[0] === 0x60) {
         const data = decoded.slice(0, decoded.length - 2);
         const checksum =
           decoded[decoded.length - 2] | (decoded[decoded.length - 1] << 8);
-        if (crc16(data) === checksum) {
+        if (constantTimeEqual16(crc16(data), checksum)) {
           return "M";
         }
       }

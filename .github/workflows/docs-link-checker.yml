@@ -1,0 +1,25 @@
+name: Mintlify Docs Link Checker
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mint.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  link-check:
+    name: Check Broken Links in Mintlify Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Lychee Link Checker
+        uses: lycheeverse/lychee-action@v1
+        with:
+          args: --verbose --no-progress 'docs/**/*.mdx' 'docs/**/*.md' 'mint.json'
+          fail: false
