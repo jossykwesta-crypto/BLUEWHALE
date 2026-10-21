@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { TypeBadge } from '../components/TypeBadge';
 import { WarningList } from '../components/WarningList';
-import { MemoField } from '../components/MemoField';
+import { MemoField, type MemoType } from '../components/MemoField';
 
 // ─── TypeBadge ────────────────────────────────────────────────────────────────
 
@@ -66,6 +66,26 @@ export const MemoFieldVisible: Story = () => {
   );
 };
 MemoFieldVisible.storyName = 'MemoField – visible';
+
+export const MemoFieldWithType: Story = () => {
+  const [value, setValue] = useState('');
+  const [memoType, setMemoType] = useState<MemoType>('id');
+  return (
+    <div style={{ maxWidth: '24rem', padding: '1rem', fontFamily: 'sans-serif' }}>
+      <MemoField
+        isVisible
+        value={value}
+        onChange={setValue}
+        memoType={memoType}
+        onMemoTypeChange={setMemoType}
+      />
+      <p style={{ color: '#64748b', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+        Resize below 480px: the type selector stacks above the input.
+      </p>
+    </div>
+  );
+};
+MemoFieldWithType.storyName = 'MemoField – with memo type';
 
 export const MemoFieldHidden: Story = () => (
   <div style={{ padding: '1rem', fontFamily: 'sans-serif', color: '#64748b' }}>

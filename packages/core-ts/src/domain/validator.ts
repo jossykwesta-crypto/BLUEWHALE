@@ -1,12 +1,13 @@
 /**
- * RFC 1035 Domain Name Validator & IP Address Literal Target Rejector.
+ * RFC 1035 Domain Name Validator.
  *
- * Implements domain name syntax validation with strict IP address literal rejection:
+ * Implements domain name syntax validation according to RFC 1035 §2.3.1 & RFC 1123:
  * - Total domain length must not exceed 253 ASCII characters.
  * - Labels are separated by periods (dots).
  * - Each label must be between 1 and 63 characters in length.
  * - Labels may only contain alphanumeric characters (a-z, A-Z, 0-9) and hyphens (-).
- * - Rejects IPv4 and IPv6 address literals unless explicitly enabled via allowIpLiterals: true.
+ * - Labels must not start or end with a hyphen.
+ * - Empty labels (consecutive dots, leading dot) are disallowed.
  */
 
 export interface DomainValidationOptions {
@@ -21,12 +22,6 @@ export interface DomainValidationOptions {
    * Defaults to true.
    */
   requireTLD?: boolean;
-
-  /**
-   * If true, permits IPv4 and IPv6 address literals as targets.
-   * Defaults to false (IP literals are rejected).
-   */
-  allowIpLiterals?: boolean;
 }
 
 export interface DomainValidationResult {
@@ -41,47 +36,15 @@ export interface DomainValidationResult {
     | "LABEL_INVALID_START"
     | "LABEL_INVALID_END"
     | "LABEL_INVALID_CHARS"
-    | "MISSING_TLD"
-    | "IP_LITERAL_DISALLOWED";
+    | "MISSING_TLD";
 }
 
 const RFC1035_LABEL_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
 const MAX_DOMAIN_LENGTH = 253;
 const MAX_LABEL_LENGTH = 63;
 
-// Regular expression to identify IPv4 dotted-decimal literals (0.0.0.0 to 255.255.255.255)
-const IPV4_REGEX =
-  /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-
-// Regular expression to identify IPv6 address literals (standard or bracketed [::1])
-const IPV6_REGEX =
-  /^\s*(?:\[?(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\]?|\[?(?:[0-9a-fA-F]{1,4}:){1,7}:\]?|\[?(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}\]?|\[?::(?:ffff:)?(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\]?|\[?::1\]?|\[?::\]?)\s*$/;
-
 /**
- * Checks whether a given host string is an IPv4 or IPv6 address literal.
- */
-export function isIpLiteral(target: string): boolean {
-  if (typeof target !== "string" || target.trim() === "") {
-    return false;
-  }
-  const trimmed = target.trim();
-  const unbracketed =
-    trimmed.startsWith("[") && trimmed.endsWith("]")
-      ? trimmed.slice(1, -1)
-      : trimmed;
-
-  if (IPV4_REGEX.test(unbracketed)) {
-    return true;
-  }
-  if (trimmed.includes(":") && IPV6_REGEX.test(trimmed)) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Validates a domain name according to RFC 1035 / RFC 1123 specifications,
- * rejecting IP address literals unless explicitly configured.
+ * Validates a domain name according to RFC 1035 / RFC 1123 specifications.
  *
  * @param domain The domain string to validate.
  * @param options Optional configuration parameters.
@@ -91,11 +54,7 @@ export function validateDomain(
   domain: string,
   options: DomainValidationOptions = {}
 ): DomainValidationResult {
-  const {
-    allowTrailingDot = true,
-    requireTLD = true,
-    allowIpLiterals = false,
-  } = options;
+  const { allowTrailingDot = true, requireTLD = true } = options;
 
   if (typeof domain !== "string" || domain.trim() === "") {
     return {
@@ -106,21 +65,6 @@ export function validateDomain(
   }
 
   let cleaned = domain.trim();
-
-  // Check for IP address literals
-  if (isIpLiteral(cleaned)) {
-    if (!allowIpLiterals) {
-      return {
-        valid: false,
-        error: "IP address literals are rejected as domain targets unless explicitly configured",
-        code: "IP_LITERAL_DISALLOWED",
-      };
-    }
-    return {
-      valid: true,
-      normalized: cleaned.toLowerCase(),
-    };
-  }
 
   // Handle trailing dot for root label (FQDN)
   if (cleaned.endsWith(".")) {
@@ -211,7 +155,7 @@ export function validateDomain(
 }
 
 /**
- * Returns true if the given domain string is valid according to RFC 1035 and IP literal policy.
+ * Returns true if the given domain string is valid according to RFC 1035.
  */
 export function isValidDomain(
   domain: string,

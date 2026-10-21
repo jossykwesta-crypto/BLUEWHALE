@@ -1,0 +1,253 @@
+---
+title: "Threat Model"
+description: "How deposits get misattributed, and what Bluewhale does about each attack."
+icon: "shield-halved"
+---
+
+Bluewhale sits at one decision point: given a payment's destination, memo and
+sender, **which user gets credited?** Every attack on a deposit pipeline aims to
+make that answer wrong. Either an attacker's payment lands in someone else's
+account, or a real user's payment lands nowhere and gets "recovered" by whoever
+complains loudest.
+
+This page covers what Bluewhale defends against, how each SDK reports it, and
+what it deliberately leaves to you.
+
+## Scope
+
+**In scope:** interpreting a destination address, a memo and a source account
+that you have already read from a confirmed transaction.
+
+**Out of scope:** Bluewhale is pure address and memo analysis. It does not
+fetch transactions, verify signatures, check that a payment succeeded, track
+which payments you have already credited, or (outside the optional SEP-0029
+check) talk to the network. The [audit checklist](#audit-checklist) covers what
+your integration must do around it.
+
+<Info>
+  Every behaviour below is the same in core-ts, core-go and core-dart, and is
+  pinned by `spec/vectors.json`. Codes are the normative strings from
+  `spec/schema.json`.
+</Info>
+
+## Attack vectors
+
+### 1. Memo collision through non-canonical IDs
+
+**Attack.** A pooled account identifies users by a numeric memo. The attacker
+sends a memo that a naive integration reads as a *different* string from the
+victim's ID but that still means the same number, or the reverse:
+
+- `MEMO_TEXT "0042"` vs. user `42`: a string lookup misses, and the deposit
+  becomes "unclaimed".
+- `MEMO_TEXT "42"` vs. `MEMO_ID 42`: some pipelines only look at one memo type.
+- `MEMO_TEXT " 42"` or `"42\n"`: whitespace survives a lookup in some
+  databases and is trimmed in others, so two systems disagree on who was paid.
+
+**Mitigation.** Bluewhale reduces every routable memo to one canonical decimal
+string before you see it:
+
+- Leading zeros are stripped, and the result carries a
+  `NON_CANONICAL_ROUTING_ID` warning with the original and normalized values,
+  so `"0042"` and `"42"` both route to `42`, visibly.
+- Numeric `MEMO_TEXT` routes the same way as `MEMO_ID`.
+- Anything that is not purely ASCII digits, including surrounding whitespace,
+  is **not** routed. It produces `MEMO_TEXT_UNROUTABLE` (text) or
+  `MEMO_ID_INVALID_FORMAT` (id), never a best-effort guess.
+
+**Your part.** Key user lookups on `routingId` as returned, never on the raw
+memo, and store your users' IDs in the same canonical form.
+
+### 2. Precision truncation
+
+**Attack.** Routing IDs are uint64, up to `18446744073709551615`. JavaScript
+`Number` (and Flutter Web `int`, which compiles to one) is exact only to
+`2^53 - 1`. An attacker who controls a large memo or muxed ID can pick one that
+*rounds* to the victim's ID:
+
+```js
+Number("9007199254740993") === 9007199254740992 // true
+```
+
+Anything that passes the ID through `Number`, `parseInt`, `JSON.parse` of a
+bare number, or a float database column can credit the wrong user.
+
+**Mitigation.**
+
+- `routingId` is always a **decimal string** in JSON, and a `BigInt`
+  (TypeScript, Dart) or `uint64` (Go) in memory. It never passes through a
+  float.
+- Values above uint64 are rejected (`MEMO_ID_INVALID_FORMAT` /
+  `MEMO_TEXT_UNROUTABLE`) instead of wrapping or saturating.
+- Dart exposes `idString` and `SafeRoutingId` for Flutter Web. See
+  [Flutter Web BigInt safety](/docs/guides/flutter-web-bigint).
+
+**Your part.** Keep the ID as a string or a 64-bit unsigned integer end to end:
+in your database schema, your queue messages and your logs. See
+[Preventing integer overflow](/docs/guides/preventing-integer-overflow).
+
+### 3. Missing required memo
+
+**Attack.** A sender pays a pooled account without a memo, by mistake or on
+purpose. The funds have no beneficiary. Social-engineering follows: someone
+opens a support ticket claiming the deposit. The weak point is a pipeline that
+credits memo-less deposits to a default account, or approves claims without
+proof.
+
+**Mitigation.**
+
+- With no usable memo, `routingId` is null and `routingSource` is `none`.
+  Bluewhale never invents a beneficiary.
+- When you pass a memo-requirement fetcher (`extractRoutingAsync` in core-ts
+  and core-dart, `ExtractRoutingWithMemoRequirement` /
+  `ExtractRoutingWithContext` in core-go), a destination that has set the
+  [SEP-0029](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md)
+  `config.memo_required` flag gets a `MISSING_REQUIRED_MEMO` warning at
+  `error` severity.
+
+<Warning>
+  The SEP-0029 check **fails open**. If the lookup fails or times out, the
+  result is returned without `MISSING_REQUIRED_MEMO`, so a Horizon outage looks
+  the same as "no memo required". Treat `routingSource: none` on a pooled
+  account as unroutable *whether or not* the warning is present.
+</Warning>
+
+**Your part.** Quarantine every deposit to a pooled account with no routing ID,
+and release it only against proof from the sender (transaction hash plus a
+signed message from the source account, or your normal KYC flow). See
+[MISSING_REQUIRED_MEMO and SEP-0029](/docs/concepts/warning-system#missing-required-memo-and-sep-0029).
+
+### 4. Conflicting routing data (memo injection with muxed addresses)
+
+**Attack.** An M-address carries its own routing ID. The attacker pays the
+victim's M-address and *also* attaches a memo containing a different user's
+ID, or their own. An integration that reads the memo first credits the memo's
+user. One that reads the M-address first credits the M-address's user. If two
+systems in the pipeline disagree, the same payment can be credited twice or
+reversed.
+
+**Mitigation.** The rule is fixed and identical in every SDK: **the M-address ID
+always wins**, and the memo is never used for routing.
+
+| Memo sent with an M-address | Result | Warning |
+|---|---|---|
+| none | M-address ID | — |
+| `MEMO_ID`, or numeric `MEMO_TEXT` | M-address ID | `MEMO_PRESENT_WITH_MUXED` (`warn`) |
+| any other memo | M-address ID | `MEMO_IGNORED_FOR_MUXED` (`info`) |
+
+**Your part.** Never reimplement this precedence elsewhere in your pipeline.
+Route on Bluewhale's result alone, and alert on `MEMO_PRESENT_WITH_MUXED`: an
+honest wallet rarely sends both.
+
+### 5. Destination spoofing and look-alike addresses
+
+**Attack.** The attacker gets a user, or your own UI, to accept a destination
+that is not what it looks like:
+
+- a near-miss address with one character changed (copy-paste malware swaps
+  clipboard contents for a similar-looking address)
+- a different strkey type that superficially resembles an account: a secret
+  seed (`S…`), a pre-auth transaction (`T…`), a hash-x signer (`X…`), or a
+  contract (`C…`), which cannot receive a classic payment
+- a lowercase or mixed-case address, which some systems treat as a different
+  string from the canonical uppercase one
+- a federation address (`name*domain.com`) whose resolution the attacker
+  controls
+
+**Mitigation.**
+
+- Every address is fully decoded: base32, version byte and **CRC16 checksum**.
+  A one-character change fails with `INVALID_CHECKSUM`, not a quiet mismatch.
+- Only `G`, `M` and `C` strkeys are accepted. Seeds (`S…`), pre-auth keys
+  (`T…`), hash-x signers (`X…`) and federation addresses (`name*domain`) are
+  all rejected with a `destinationError` of `UNKNOWN_PREFIX`, so none of them
+  can be routed. An `S…` value in a destination field usually means someone
+  is about to leak a secret key, so do not log it.
+- A `C…` destination returns `INVALID_DESTINATION` at `error` severity.
+- Lowercase input is normalized and flagged with `NON_CANONICAL_ADDRESS`
+  (`warn`), so you can compare and store the canonical form.
+- Federation addresses are never resolved. Resolve them yourself over a
+  trusted channel, then validate the resulting G-address with Bluewhale.
+
+<Note>
+  `spec/schema.json` also defines the more specific `REJECTED_SEED_KEY`,
+  `REJECTED_PREAUTH`, `REJECTED_HASH_X` and `FEDERATION_ADDRESS_NOT_SUPPORTED`
+  codes. The SDKs do not emit them yet; today all four cases report
+  `UNKNOWN_PREFIX`. The outcome, no routing, is the same.
+</Note>
+
+**Your part.** In user-facing input, show the canonical address back and, for
+first-time destinations, ask the user to confirm it. A checksum cannot catch a
+*valid* address the attacker owns.
+
+### Also handled: deposits from contracts
+
+A payment whose source is a Soroban contract (`C…`) cannot be attributed to a
+memo or muxed ID the way an account payment can. Bluewhale clears the routing
+state and returns `CONTRACT_SENDER_DETECTED`, so a contract cannot impersonate
+a routed user deposit. Handle these through your contract-specific
+reconciliation.
+
+## Severity and what to do with it
+
+Handle by code, not by severity alone. As a baseline:
+
+| Severity | Codes | Default action |
+|---|---|---|
+| `error` | `INVALID_DESTINATION`, `MISSING_REQUIRED_MEMO` | Do not credit. Quarantine. |
+| `warn` | `MEMO_PRESENT_WITH_MUXED`, `NON_CANONICAL_ROUTING_ID`, `NON_CANONICAL_ADDRESS`, `MEMO_ID_INVALID_FORMAT`, `MEMO_TEXT_UNROUTABLE`, `UNSUPPORTED_MEMO_TYPE` | Credit only if `routingId` is set; log and alert. |
+| `info` | `MEMO_IGNORED_FOR_MUXED`, `CONTRACT_SENDER_DETECTED` | Log. |
+
+Any `destinationError` means the destination is unusable. There is no routing
+ID to credit.
+
+## Audit checklist
+
+Use this when reviewing an exchange or custodian integration. Bluewhale covers
+the routing decision; everything else on this list is the integrator's.
+
+<Steps>
+  <Step title="Credit only confirmed, successful payments">
+    Read payments from a source you trust (your own Horizon or RPC node, or a
+    provider with a signed SLA), only after the ledger is closed, and only for
+    operations that succeeded. Path payments credit the *received* amount, not
+    the sent one.
+  </Step>
+  <Step title="Make crediting idempotent">
+    Key every credit on `(transaction hash, operation index)` with a unique
+    constraint, so a replayed webhook, a restarted indexer or a race between
+    two workers cannot credit the same payment twice.
+  </Step>
+  <Step title="Route on Bluewhale's result, and only there">
+    Use `routingId` and `destinationBaseAccount` as returned. Grep for any
+    other place that parses memos or muxed IDs, and remove it.
+  </Step>
+  <Step title="Keep routing IDs exact end to end">
+    Check the database column type, the JSON encoder, the message queue and
+    any analytics export for a step that turns the ID into a float.
+  </Step>
+  <Step title="Quarantine anything unroutable">
+    No routing ID, any `error`-severity warning, or any `destinationError` goes
+    to a suspense account with a manual, evidence-based release process.
+  </Step>
+  <Step title="Watch the asset, not only the amount">
+    Confirm the asset code *and issuer* before crediting. A fake `USDC` from a
+    different issuer has the same code.
+  </Step>
+  <Step title="Alert on anomalies">
+    Spikes in `MEMO_PRESENT_WITH_MUXED`, `NON_CANONICAL_ROUTING_ID` or
+    unroutable deposits are often probing, not user error.
+  </Step>
+  <Step title="Pin and test the library">
+    Pin the Bluewhale version, run `spec/vectors.json` against your build in
+    CI, and read the changelog before upgrading. Routing changes are called out
+    as breaking.
+  </Step>
+</Steps>
+
+## Reporting a vulnerability
+
+If you find a way to make Bluewhale return a routing result that credits the
+wrong party, please report it privately as described in
+[SECURITY.md](https://github.com/progidyken-hub/BLUEWHALE/blob/main/SECURITY.md)
+rather than opening a public issue.

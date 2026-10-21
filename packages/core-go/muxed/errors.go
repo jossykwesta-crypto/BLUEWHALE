@@ -30,6 +30,26 @@ func (e *AddressError) Unwrap() error {
 	return e.Cause
 }
 
+// ErrorCode returns the error's code as a plain string, which the core-go
+// sentinels match on.
+func (e *AddressError) ErrorCode() string {
+	return string(e.Code)
+}
+
+// Is allows errors.Is to match by Code rather than by pointer identity, so a
+// freshly built &AddressError{Code: ErrInvalidLength} matches
+// ErrInvalidLengthError. Any error exposing the same code through ErrorCode()
+// (such as corego.ErrInvalidLength) matches too.
+func (e *AddressError) Is(target error) bool {
+	if e == nil {
+		return false
+	}
+	if t, ok := target.(interface{ ErrorCode() string }); ok {
+		return string(e.Code) == t.ErrorCode()
+	}
+	return false
+}
+
 // Predefined muxed address errors
 var (
 	ErrInvalidGAddressError    = &AddressError{Code: ErrInvalidGAddress, Message: "invalid G address"}

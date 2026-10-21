@@ -1,0 +1,33 @@
+/*
+ * Optional stylesheet for @redishfish/bluewhale.
+ *
+ *   import '@redishfish/bluewhale/styles.css';
+ *
+ * The components work without it: their defaults are inline styles, and
+ * MemoField's row already wraps on narrow containers. This file pins the
+ * mobile layout to an explicit viewport breakpoint. `!important` is needed
+ * only because it has to win over those inline defaults; your own classes
+ * passed through `className` can still override it.
+ */
+
+/* Phones: stack the memo type selector above the memo input, full width. */
+@media (max-width: 479.98px) {
+  .bw-memo-field__row {
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .bw-memo-field__type,
+  .bw-memo-field__input {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+  }
+}
+
+/* Coarse pointers (touch screens) of any size keep 44x44px targets. */
+@media (pointer: coarse) {
+  .bw-memo-field__type,
+  .bw-memo-field__input {
+    min-height: 44px;
+  }
+}

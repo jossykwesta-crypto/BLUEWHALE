@@ -1,0 +1,41 @@
+name: Branch Protection & Signed Commits
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to protect"
+        required: false
+        default: "main"
+      dry_run:
+        description: "Validate configuration without mutating repository settings"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  enforce-branch-protection:
+    name: Enforce branch protection & signed commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate and apply branch protection configuration
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PROTECTED_BRANCH: ${{ inputs.branch || 'main' }}
+          GITHUB_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ] || [ -z "$GITHUB_TOKEN" ]; then
+            node scripts/configure-branch-protection.js --dry-run
+          else
+            node scripts/configure-branch-protection.js
+          fi

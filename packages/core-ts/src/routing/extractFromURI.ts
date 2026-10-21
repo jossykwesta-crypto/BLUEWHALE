@@ -74,6 +74,35 @@ export function sanitizeSep7UriForLogging(uriString: string): string {
 }
 
 /**
+ * Keys that would reach `Object.prototype` (or a constructor) if written
+ * onto a plain object. They are never valid SEP-0007 parameters.
+ */
+const FORBIDDEN_QUERY_KEYS: ReadonlySet<string> = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Query parameters as a prototype-less record. */
+export type QueryParams = Record<string, string | undefined>;
+
+/**
+ * Parse a URI query string into a prototype-less record.
+ *
+ * The accumulator is created with `Object.create(null)`, so no key can
+ * resolve to an inherited `Object.prototype` member, and `__proto__`,
+ * `constructor`, and `prototype` are dropped outright. When a key repeats,
+ * the first value wins, matching `URLSearchParams#get`.
+ *
+ * @throws if the query string cannot be parsed by `URLSearchParams`.
+ */
+export function parseQueryParams(queryString: string): QueryParams {
+  const params: QueryParams = Object.create(null);
+  for (const [key, value] of new URLSearchParams(queryString)) {
+    if (FORBIDDEN_QUERY_KEYS.has(key)) continue;
+    if (Object.prototype.hasOwnProperty.call(params, key)) continue;
+    params[key] = value;
+  }
+  return params;
+}
+
+/**
  * Map SEP-0007 memo_type values to internal KnownMemoType.
  */
 function mapMemoType(sep7MemoType: string | undefined): RoutingInput["memoType"] {
@@ -148,9 +177,9 @@ export function extractRoutingFromURI(uriString: string): ExtractRoutingFromURIR
   }
 
   // 4. Parse query parameters safely
-  let params: URLSearchParams;
+  let params: QueryParams;
   try {
-    params = new URLSearchParams(queryString);
+    params = parseQueryParams(queryString);
   } catch {
     return {
       success: false,
@@ -160,7 +189,7 @@ export function extractRoutingFromURI(uriString: string): ExtractRoutingFromURIR
   }
 
   // 5. Extract required destination
-  const destination = params.get("destination");
+  const destination = params.destination ?? null;
   if (!destination || destination.trim() === "") {
     return {
       success: false,
@@ -172,16 +201,16 @@ export function extractRoutingFromURI(uriString: string): ExtractRoutingFromURIR
   // 6. Extract optional parameters with safe decoding
   const rawParams: SEP7PayParams = {
     destination: safelyDecode(destination.trim()),
-    amount: safelyDecode(params.get("amount")),
-    assetCode: safelyDecode(params.get("asset_code")),
-    assetIssuer: safelyDecode(params.get("asset_issuer")),
-    memo: safelyDecode(params.get("memo")),
-    memoType: safelyDecode(params.get("memo_type")),
-    callback: safelyDecode(params.get("callback")),
-    msg: safelyDecode(params.get("msg")),
-    networkPassphrase: safelyDecode(params.get("network_passphrase")),
-    originDomain: safelyDecode(params.get("origin_domain")),
-    signature: safelyDecode(params.get("signature")),
+    amount: safelyDecode(params.amount ?? null),
+    assetCode: safelyDecode(params.asset_code ?? null),
+    assetIssuer: safelyDecode(params.asset_issuer ?? null),
+    memo: safelyDecode(params.memo ?? null),
+    memoType: safelyDecode(params.memo_type ?? null),
+    callback: safelyDecode(params.callback ?? null),
+    msg: safelyDecode(params.msg ?? null),
+    networkPassphrase: safelyDecode(params.network_passphrase ?? null),
+    originDomain: safelyDecode(params.origin_domain ?? null),
+    signature: safelyDecode(params.signature ?? null),
   };
 
   // 7. Build RoutingInput for extractRouting

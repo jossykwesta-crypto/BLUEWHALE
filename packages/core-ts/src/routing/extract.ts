@@ -4,6 +4,7 @@ import { parse } from "../address/parse";
 import { detect } from "../address/detect";
 import { AddressParseError } from "../address/errors";
 import { normalizeMemoTextId } from "./memo";
+import { withRoutingResultJSON } from "./result";
 
 /**
  * Numeric weight of each warning severity. This ordering is normative and is
@@ -74,10 +75,17 @@ export function isRoutableAddress(address: unknown): address is string {
  * 3. C-addresses: Returned as a structured result with an INVALID_DESTINATION warning.
  * 4. Unknown prefixes / malformed input: Returned with a destinationError.
  *
+ * The result can be passed straight to `JSON.stringify`: it carries a
+ * non-enumerable `toJSON()` that writes `routingId` as a decimal string.
+ *
  * @param input - The destination address and optional memo components.
  * @returns A result containing the base account, routing ID, source, and any warnings.
  */
 export function extractRouting(input: RoutingInput): RoutingResult {
+  return withRoutingResultJSON(extractRoutingResult(input));
+}
+
+function extractRoutingResult(input: RoutingInput): RoutingResult {
   // Only throw for a non-string destination — this is a programmer error, not
   // an address-domain error, and cannot be meaningfully expressed as a
   // RoutingResult.
@@ -130,6 +138,9 @@ export function extractRouting(input: RoutingInput): RoutingResult {
     throw error;
   }
 
+  // parse() throws instead of returning kind "invalid"; this narrows the
+  // type and guards against that changing. Excluded from coverage.
+  /* v8 ignore next 8 */
   if (parsed.kind === "invalid") {
     return {
       destinationBaseAccount: null,
@@ -204,7 +215,9 @@ export function extractRouting(input: RoutingInput): RoutingResult {
         routingId = parsedMemoId.toString();
         routingSource = "memo";
         warnings.push(...norm.warnings);
+        /* v8 ignore start */
       } catch {
+        // normalizeMemoTextId only returns digits, so BigInt() cannot throw.
         routingSource = "none";
         warnings.push(...norm.warnings);
         warnings.push({
@@ -213,6 +226,7 @@ export function extractRouting(input: RoutingInput): RoutingResult {
           message: "MEMO_ID was empty, non-numeric, or exceeded uint64 max.",
         });
       }
+      /* v8 ignore stop */
     } else {
       routingSource = "none";
       warnings.push(...norm.warnings);

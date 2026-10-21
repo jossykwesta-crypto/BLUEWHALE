@@ -39,6 +39,17 @@ Every public function in every implementation MUST be non-throwing for any arbit
 
 Contract addresses (`C...`) are valid StrKeys but are **invalid destinations** for classic payment routing. Any `extractRouting` implementation MUST emit an `INVALID_DESTINATION` warning with `severity: 'error'` if a C-address is provided as the destination.
 
+### 5. Whitespace Handling (Normative)
+
+Implementations MUST handle leading and trailing whitespace in address inputs consistently. The normative behavior is:
+
+- **Trim, then parse**: Implementations MUST trim leading and trailing ASCII whitespace (space `U+0020`, tab `U+0009`, newline `U+000A`, carriage return `U+000D`) from the input string before parsing.
+- **Emit a warning**: When trimming occurs, the implementation MUST emit a `NON_CANONICAL_ADDRESS` warning (severity `warning`) in `warnings[]`. The parsed address MUST still be returned in `destination`.
+- **Never error on whitespace alone**: Whitespace MUST NOT cause an `INVALID_CHECKSUM` or any other `ErrorCode`. Only the trimmed content is validated.
+- **Interior whitespace is invalid**: Whitespace between characters of an address (e.g. `G... A...`) is NOT trimmed and MUST result in an `INVALID_CHECKSUM` error.
+
+This rule applies uniformly to `G...` (account), `M...` (muxed account), and `C...` (contract) StrKeys. For `C...` addresses, the `INVALID_DESTINATION` warning (severity `error`) is emitted in addition to the `NON_CANONICAL_ADDRESS` warning when trimming occurred.
+
 ---
 
 ## 🧪 Testing & Compliance
@@ -46,6 +57,14 @@ Contract addresses (`C...`) are valid StrKeys but are **invalid destinations** f
 ### The Canary Vector
 
 To protect against JavaScript's 53-bit integer precision loss, the spec includes a **2^53+1 canary** (`id: "9007199254740993"`). Any implementation using float-based numbers internally will fail this test.
+
+### Whitespace Vectors
+
+The suite includes vectors covering leading and trailing spaces, tabs, newlines, and carriage returns around `G`, `M`, and `C` addresses. Each such vector asserts:
+
+- `destination` equals the trimmed, canonical address.
+- `warnings[]` contains `NON_CANONICAL_ADDRESS`.
+- `destinationError` is absent.
 
 ### Running Validation
 
