@@ -38,7 +38,8 @@ void main() {
 
     final input = RoutingInput(destination: baseG, memoType: 'none');
     expect(extractRoutingSync(input).source, RoutingSource.none);
-    expect(extractRouting(input), completion(isA<RoutingResult>()));
+    expect(extractRouting(input).source, RoutingSource.none);
+    expect(extractRoutingAsync(input), completion(isA<RoutingResult>()));
   });
 
   test('exception types are catchable by their exported names', () {

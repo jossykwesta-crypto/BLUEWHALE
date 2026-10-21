@@ -22,3 +22,20 @@ If you find a routing edge case that isn't covered, follow these steps to add it
     Submit your changes with a `changeset` describing the new edge case.
   </Step>
 </Steps>
+
+## SEP-0007 memo encoding vectors
+
+SEP-0007 payment URIs frequently carry URL-encoded UTF-8 text in the `memo`
+parameter, for example `web+stellar:pay?destination=...&memo=Invoice%20%231234`.
+When adding vectors for these URIs, keep the following in mind:
+
+- **Positive vectors** should include percent-encoded spaces (`%20`), symbols
+  (`%23` for `#`, `%26` for `&`), and non-ASCII UTF-8 byte sequences (e.g.
+  `%C3%A9` for `é`). The expected `routingResult.memo` must be the *unescaped*
+  UTF-8 string (e.g. `Invoice #1234`, `Café`), not the raw encoded form.
+- **Negative vectors** should cover malformed percent encodings such as an
+  invalid escape (`%GG`) or a trailing `%` with no following hex digits. These
+  must be rejected rather than silently decoded.
+
+Add both categories to `spec/vectors.json` so every implementation is checked
+against the same decoding behavior.

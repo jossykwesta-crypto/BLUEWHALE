@@ -228,369 +228,223 @@
       "tags": ["positive"]
     },
     {
-      "module": "extract_routing",
-      "description": "G-address + MEMO_ID routing with 2^53+1 canary",
+      "module": "toml_lookup",
+      "description": "valid apex domain resolves stellar.toml at well-known path",
       "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "id",
-        "memoValue": "9007199254740993"
+        "domain": "example.com"
       },
       "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "9007199254740993",
-        "routingSource": "memo",
-        "warnings": []
+        "url": "https://example.com/.well-known/stellar.toml",
+        "error": null
       },
-      "tags": ["positive", "edge"]
+      "tags": ["positive", "sep-0029"]
     },
     {
-      "module": "extract_routing",
-      "description": "G-address + MEMO_TEXT numeric routing",
+      "module": "toml_lookup",
+      "description": "valid subdomain resolves stellar.toml at well-known path",
       "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "200"
+        "domain": "wallet.example.com"
       },
       "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "200",
-        "routingSource": "memo",
-        "warnings": []
+        "url": "https://wallet.example.com/.well-known/stellar.toml",
+        "error": null
       },
-      "tags": ["positive"]
+      "tags": ["positive", "sep-0029"]
     },
     {
-      "module": "extract_routing",
-      "description": "G-address + MEMO_TEXT '0' valid canonical routing ID",
+      "module": "toml_lookup",
+      "description": "domain with invalid characters (underscore) must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "0"
+        "domain": "exa_mple.com"
       },
       "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "0",
-        "routingSource": "memo",
-        "warnings": []
-      },
-      "tags": ["positive", "edge"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "G-address + MEMO_TEXT '007' non-canonical leading zeros normalized",
-      "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "007"
-      },
-      "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "7",
-        "routingSource": "memo",
-        "warnings": [
-          {
-            "code": "NON_CANONICAL_ROUTING_ID",
-            "severity": "warn",
-            "message": "Memo routing ID had leading zeros. Normalized to canonical decimal.",
-            "normalization": {
-              "original": "007",
-              "normalized": "7"
-            }
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "G-address + MEMO_TEXT '000' non-canonical leading zeros normalized to 0",
-      "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "000"
-      },
-      "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "0",
-        "routingSource": "memo",
-        "warnings": [
-          {
-            "code": "NON_CANONICAL_ROUTING_ID",
-            "severity": "warn",
-            "message": "Memo routing ID had leading zeros. Normalized to canonical decimal.",
-            "normalization": {
-              "original": "000",
-              "normalized": "0"
-            }
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "Memo ID leading zeros normalization",
-      "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "id",
-        "memoValue": "007"
-      },
-      "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": "7",
-        "routingSource": "memo",
-        "warnings": [
-          {
-            "code": "NON_CANONICAL_ROUTING_ID",
-            "severity": "warn",
-            "message": "Memo routing ID had leading zeros. Normalized to canonical decimal.",
-            "normalization": {
-              "original": "007",
-              "normalized": "7"
-            }
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "MEMO_TEXT 28-byte multi-byte UTF-8 sequence at valid limit but unroutable non-numeric",
-      "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "🐋🐋🐋🐋🐋🐋🐋"
-      },
-      "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": null,
-        "routingSource": "none",
-        "warnings": [
-          {
-            "code": "MEMO_TEXT_UNROUTABLE",
-            "severity": "warn",
-            "message": "MEMO_TEXT was not a valid numeric uint64."
-          }
-        ]
-      },
-      "tags": ["negative", "edge", "utf8"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "MEMO_TEXT 29-byte multi-byte UTF-8 sequence exceeding 28-byte limit",
-      "input": {
-        "destination": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "memoType": "text",
-        "memoValue": "🐋🐋🐋🐋🐋🐋🐋a"
-      },
-      "expected": {
-        "destinationBaseAccount": "GA7QYNF7SZFX4X7X5JFZZ3UQ6BXHDSY2RKVKZKX5FFQJ1ZMZX1",
-        "routingId": null,
-        "routingSource": "none",
-        "warnings": [
-          {
-            "code": "MEMO_TEXT_UNROUTABLE",
-            "severity": "warn",
-            "message": "MEMO_TEXT was not a valid numeric uint64."
-          }
-        ]
-      },
-      "tags": ["negative", "edge", "utf8"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "Contract source account (C...) clears routing state for G-address + MEMO_ID",
-      "input": {
-        "destination": "GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI",
-        "memoType": "id",
-        "memoValue": "100",
-        "sourceAccount": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
-      },
-      "expected": {
-        "destinationBaseAccount": null,
-        "routingId": null,
-        "routingSource": "none",
-        "warnings": [
-          {
-            "code": "CONTRACT_SENDER_DETECTED",
-            "severity": "info",
-            "message": "Contract source detected. Routing state cleared."
-          }
-        ]
-      },
-      "tags": ["negative", "edge", "interop"]
-    },
-    {
-      "module": "extract_routing",
-      "description": "Contract source account (C...) clears routing state for M-address",
-      "input": {
-        "destination": "MAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQACAAAAAAAAAAAAD672",
-        "memoType": "none",
-        "sourceAccount": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
-      },
-      "expected": {
-        "destinationBaseAccount": null,
-        "routingId": null,
-        "routingSource": "none",
-        "warnings": [
-          {
-            "code": "CONTRACT_SENDER_DETECTED",
-            "severity": "info",
-            "message": "Contract source detected. Routing state cleared."
-          }
-        ]
-      },
-      "tags": ["negative", "edge", "interop"]
-    },
-    {
-      "module": "detect",
-      "description": "non-base32 digit '0' injected into address must be rejected",
-      "input": {
-        "address": "GA0CUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI"
-      },
-      "expected": {
-        "kind": null,
-        "address": null,
-        "warnings": [
-          {
-            "code": "INVALID_STRKEY",
-            "severity": "error",
-            "message": "address contains characters outside the base32 alphabet"
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "detect",
-      "description": "punctuation injected into address must be rejected",
-      "input": {
-        "address": "GA!CUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI"
-      },
-      "expected": {
-        "kind": null,
-        "address": null,
-        "warnings": [
-          {
-            "code": "INVALID_STRKEY",
-            "severity": "error",
-            "message": "address contains characters outside the base32 alphabet"
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "detect",
-      "description": "embedded null byte must be rejected without crashing or truncating",
-      "input": {
-        "address": "GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRS\u0000"
-      },
-      "expected": {
-        "kind": null,
-        "address": null,
-        "warnings": [
-          {
-            "code": "INVALID_STRKEY",
-            "severity": "error",
-            "message": "address contains characters outside the base32 alphabet"
-          }
-        ]
-      },
-      "tags": ["negative", "edge"]
-    },
-    {
-      "module": "extract_from_uri",
-      "description": "valid web+stellar:pay URI with G-destination and MEMO_ID",
-      "input": {
-        "uri": "web+stellar:pay?destination=GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI&memo=12345&memo_type=MEMO_ID"
-      },
-      "expected": {
-        "success": true,
-        "routing": {
-          "destinationBaseAccount": "GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI",
-          "routingId": "12345",
-          "routingSource": "memo",
-          "warnings": []
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name contains invalid characters"
         }
       },
-      "tags": ["positive", "interop"]
+      "tags": ["negative", "sep-0029"]
     },
     {
-      "module": "extract_from_uri",
-      "description": "valid web+stellar:pay URI with numeric MEMO_TEXT",
+      "module": "toml_lookup",
+      "description": "domain with leading hyphen in a label must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "uri": "web+stellar:pay?destination=GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI&memo=98765&memo_type=MEMO_TEXT"
+        "domain": "-example.com"
       },
       "expected": {
-        "success": true,
-        "routing": {
-          "destinationBaseAccount": "GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI",
-          "routingId": "98765",
-          "routingSource": "memo",
-          "warnings": []
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain label must not start or end with a hyphen"
         }
       },
-      "tags": ["positive"]
+      "tags": ["negative", "sep-0029"]
     },
     {
-      "module": "extract_from_uri",
-      "description": "valid web+stellar:pay URI with URL-encoded parameters",
+      "module": "toml_lookup",
+      "description": "domain with trailing hyphen in a label must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "uri": "web+stellar:pay?destination=%20GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI%20&amount=10.5&memo=hello%20world&memo_type=MEMO_TEXT"
+        "domain": "example-.com"
       },
       "expected": {
-        "success": true,
-        "routing": {
-          "destinationBaseAccount": "GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI",
-          "routingId": null,
-          "routingSource": "none",
-          "warnings": [
-            {
-              "code": "MEMO_TEXT_UNROUTABLE",
-              "severity": "warn",
-              "message": "MEMO_TEXT was not a valid numeric uint64."
-            }
-          ]
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain label must not start or end with a hyphen"
         }
       },
-      "tags": ["positive", "edge"]
+      "tags": ["negative", "sep-0029"]
     },
     {
-      "module": "extract_from_uri",
-      "description": "reject URI with invalid scheme",
+      "module": "toml_lookup",
+      "description": "domain exceeding 253 character maximum length must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "uri": "https://example.com/pay?destination=GAYCUYT553C5LHVE2XPW5GMEJT4BXGM7AHMJWLAPZP53KJO7EIQADRSI"
+        "domain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"
       },
       "expected": {
-        "success": false,
-        "code": "INVALID_URI"
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name exceeds maximum length of 253 characters"
+        }
       },
-      "tags": ["negative", "edge"]
+      "tags": ["negative", "sep-0029"]
     },
     {
-      "module": "extract_from_uri",
-      "description": "reject URI with unsupported operation",
+      "module": "toml_lookup",
+      "description": "domain label exceeding 63 character maximum length must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "uri": "web+stellar:tx?xdr=AAAA"
+        "domain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com"
       },
       "expected": {
-        "success": false,
-        "code": "UNSUPPORTED_OPERATION"
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain label exceeds maximum length of 63 characters"
+        }
       },
-      "tags": ["negative"]
+      "tags": ["negative", "sep-0029"]
     },
     {
-      "module": "extract_from_uri",
-      "description": "reject URI with missing destination",
+      "module": "toml_lookup",
+      "description": "unicode homoglyph domain (Cyrillic a) must be rejected with INVALID_DOMAIN_NAME",
       "input": {
-        "uri": "web+stellar:pay?amount=100"
+        "domain": "ex\u0430mple.com"
       },
       "expected": {
-        "success": false,
-        "code": "MISSING_DESTINATION"
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name must be ASCII; unicode homoglyphs are not permitted"
+        }
       },
-      "tags": ["negative"]
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "unicode homoglyph domain (fullwidth dot) must be rejected with INVALID_DOMAIN_NAME",
+      "input": {
+        "domain": "example\uFF0Ecom"
+      },
+      "expected": {
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name must be ASCII; unicode homoglyphs are not permitted"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "empty domain must be rejected with INVALID_DOMAIN_NAME",
+      "input": {
+        "domain": ""
+      },
+      "expected": {
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name must not be empty"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "domain with empty label (consecutive dots) must be rejected with INVALID_DOMAIN_NAME",
+      "input": {
+        "domain": "example..com"
+      },
+      "expected": {
+        "url": null,
+        "error": {
+          "code": "INVALID_DOMAIN_NAME",
+          "severity": "error",
+          "message": "domain name must not contain empty labels"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "malformed TOML structure (unterminated string) must be rejected with INVALID_TOML",
+      "input": {
+        "domain": "example.com",
+        "toml": "VERSION = \"1.0.0\n"
+      },
+      "expected": {
+        "url": "https://example.com/.well-known/stellar.toml",
+        "error": {
+          "code": "INVALID_TOML",
+          "severity": "error",
+          "message": "stellar.toml is not valid TOML"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "malformed TOML structure (duplicate key) must be rejected with INVALID_TOML",
+      "input": {
+        "domain": "example.com",
+        "toml": "VERSION = \"1.0.0\"\nVERSION = \"2.0.0\"\n"
+      },
+      "expected": {
+        "url": "https://example.com/.well-known/stellar.toml",
+        "error": {
+          "code": "INVALID_TOML",
+          "severity": "error",
+          "message": "stellar.toml is not valid TOML"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
+    },
+    {
+      "module": "toml_lookup",
+      "description": "malformed URL redirect (non-https scheme) must be rejected with INVALID_REDIRECT",
+      "input": {
+        "domain": "example.com",
+        "redirect": "http://example.com/.well-known/stellar.toml"
+      },
+      "expected": {
+        "url": null,
+        "error": {
+          "code": "INVALID_REDIRECT",
+          "severity": "error",
+          "message": "stellar.toml redirect must use https"
+        }
+      },
+      "tags": ["negative", "sep-0029"]
     }
   ]
 }

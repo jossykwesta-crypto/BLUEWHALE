@@ -11,8 +11,16 @@ Releases are coordinated with `spec/vectors.json` `spec_version`: see
 
 ### Added
 
+- `isPublicKeyAddress`, `isMuxedAddress` and `isContractAddress` predicates,
+  narrowing to the branded `PublicKeyAddress`, `MuxedAddress` and
+  `ContractAddress` types.
 - A cross-language parity test (`src/spec/warning-codes.test.ts`) that reads
   `spec/schema.json` and asserts the `WarningCode` union matches it.
+- `JSON.stringify(extractRouting(...))` no longer throws on a `bigint`
+  `routingId`: results carry a non-enumerable `toJSON()` that writes the ID
+  as a decimal string. Also adds `stringifyRoutingResult`,
+  `toSerializableRoutingResult`, `routingIdToJSON` and the
+  `SerializedRoutingResult` type (#201).
 
 ### Fixed
 
@@ -33,6 +41,20 @@ Releases are coordinated with `spec/vectors.json` `spec_version`: see
   vectors; core-ts now substitutes identically. It also stopped asserting
   that a C-destination throws, which contradicted the vector's expected
   `INVALID_DESTINATION` result.
+- `parse` indexed into inputs too short to hold a version prefix and threw a
+  `TypeError` for non-strings. Inputs under 4 characters and non-strings now
+  fail with a structured `AddressParseError` (`INVALID_LENGTH`), which
+  `extractRouting` reports as a `destinationError` (#199).
+
+### Changed
+
+- CRC16 moved to `src/strkey/crc16.ts` as a table-driven CRC16-XModem with a
+  lazy runtime self-test (`crc16SelfTest`, check value `0x31C3`, little-endian
+  checksum bytes) and new exports `crc16Xmodem`, `crc16ChecksumBytes`,
+  `verifyCrc16Checksum` and `Crc16IntegrityError`; `detect` uses it (#196).
+- `package.json` now has an `exports` map with explicit `bun` and `deno`
+  conditions (#200) and declares `"sideEffects": false`, with a test that
+  importing only `extractRouting` stays under 5 KB gzipped (#194).
 
 ## [1.2.0] - 2026-09-24
 

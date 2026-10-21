@@ -43,7 +43,8 @@
         "docs/concepts/address-types",
         "docs/concepts/routing-logic",
         "docs/concepts/warning-system",
-        "docs/concepts/design-principles"
+        "docs/concepts/design-principles",
+        "docs/concepts/threat-model"
       ]
     },
     {

@@ -79,8 +79,24 @@ interface RoutingResult {
 | `isVisible` | `boolean` | Whether to render the field. |
 | `value` | `string` | Controlled value. |
 | `onChange` | `(v: string) => void` | Change handler. |
+| `memoType` | `MemoType` | Selected memo type (`none`, `id`, `text`, `hash`, `return`). Defaults to `text`. |
+| `onMemoTypeChange` | `(t: MemoType) => void` | Passing this shows the memo type selector. |
+| `memoTypes` | `MemoType[]` | Types offered in the selector. Defaults to all five. |
 | `className` | `string` | Extra CSS classes. |
 | `style` | `CSSProperties` | Inline style overrides. |
+
+The type selector and the memo input share one row, which wraps so the selector
+sits above the input on narrow screens. Both controls keep a 44×44px minimum
+touch target. With `memoType="none"`, the memo input is disabled.
+
+### Optional stylesheet
+
+The components need no CSS import. To pin the mobile layout to an explicit
+breakpoint (the memo row stacks below 480px), import the stylesheet once:
+
+```ts
+import '@redishfish/bluewhale/styles.css';
+```
 
 ---
 
@@ -106,6 +122,8 @@ Every component exposes stable BEM class names for CSS targeting. Inline styles 
 | `bw-warning-item` | Individual `<li>` warning |
 | `bw-memo-field` | `<MemoField>` root |
 | `bw-memo-field__label` | Label element |
+| `bw-memo-field__row` | Row holding the type selector and the input |
+| `bw-memo-field__type` | Memo type `<select>` |
 | `bw-memo-field__input` | Memo `<input>` |
 | `bw-memo-field__hint` | Hint text below the input |
 | `bw-routing-summary` | Resolved address summary box |

@@ -101,6 +101,22 @@ class RoutingWarning {
     context: WarningContext(destinationKind: 'C'),
   );
 
+  /// Deserializes a warning written by [toJson].
+  ///
+  /// Accepts any [Map] with string keys, including the `Map<dynamic, dynamic>`
+  /// that Hive and some platform channels hand back, not just the
+  /// `Map<String, dynamic>` produced by `jsonDecode`. Missing fields fall back
+  /// to empty strings and `info` severity rather than throwing, so a cached
+  /// result written by an older version still loads.
+  factory RoutingWarning.fromJson(Map<Object?, Object?> json) {
+    return RoutingWarning(
+      code: json['code'] as String? ?? '',
+      severity: json['severity'] as String? ?? WarningSeverity.info,
+      message: json['message'] as String? ?? '',
+      context: _warningContextFromJson(json['context']),
+    );
+  }
+
   /// The parsed [WarningSeverity] of this warning, or `null` if [severity]
   /// is not a recognized level.
   String? get severityLevel => WarningSeverity.tryParse(severity);
@@ -146,6 +162,33 @@ class DestinationError {
 
   /// Creates a destination error.
   DestinationError({required this.code, required this.message});
+
+  /// Deserializes an error written by [toJson]. Accepts any [Map] with string
+  /// keys (see [RoutingWarning.fromJson]).
+  factory DestinationError.fromJson(Map<Object?, Object?> json) {
+    return DestinationError(
+      code: json['code'] as String? ?? '',
+      message: json['message'] as String? ?? '',
+    );
+  }
+
+  /// Serializes this error as `{code, message}`, the shape used under
+  /// `destinationError` in [RoutingResult.toJson].
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'code': code,
+        'message': message,
+      };
+
+  @override
+  String toString() => 'DestinationError($code: $message)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DestinationError && code == other.code && message == other.message;
+
+  @override
+  int get hashCode => Object.hash(code, message);
 }
 
 /// Exception thrown when the routing input is fundamentally malformed.
@@ -264,11 +307,7 @@ final class RoutingResult {
       'routingId': id?.toString(),
       'routingSource': source.name,
       'warnings': warnings.map((w) => w.toJson()).toList(),
-      if (destinationError != null)
-        'destinationError': <String, dynamic>{
-          'code': destinationError!.code,
-          'message': destinationError!.message,
-        },
+      if (destinationError != null) 'destinationError': destinationError!.toJson(),
     };
   }
 
@@ -280,7 +319,17 @@ final class RoutingResult {
   ///
   /// The routing ID is parsed from a **decimal string** using [SafeRoutingId]
   /// to guarantee bit-exact values on Flutter Web.
-  factory RoutingResult.fromJson(Map<String, dynamic> json) {
+  ///
+  /// [json] may be any [Map] with string keys. `jsonDecode` returns
+  /// `Map<String, dynamic>`, but Hive and some platform channels return
+  /// `Map<dynamic, dynamic>` for the result and for every nested warning and
+  /// error; both shapes load identically.
+  ///
+  /// ```dart
+  /// await box.put('lastRouting', result.toJson());
+  /// final cached = RoutingResult.fromJson(box.get('lastRouting') as Map);
+  /// ```
+  factory RoutingResult.fromJson(Map<Object?, Object?> json) {
     // Parse routingSource enum
     final sourceName = json['routingSource'] as String? ?? 'none';
     final source = RoutingSource.values.firstWhere(
@@ -302,26 +351,14 @@ final class RoutingResult {
     final warnings = <RoutingWarning>[];
     if (rawWarnings is List) {
       for (final w in rawWarnings) {
-        if (w is Map<String, dynamic>) {
-          warnings.add(RoutingWarning(
-            code: w['code'] as String? ?? '',
-            severity: w['severity'] as String? ?? WarningSeverity.info,
-            message: w['message'] as String? ?? '',
-            context: _warningContextFromJson(w['context']),
-          ));
-        }
+        if (w is Map) warnings.add(RoutingWarning.fromJson(w));
       }
     }
 
     // Parse optional destinationError
-    DestinationError? destinationError;
     final rawError = json['destinationError'];
-    if (rawError is Map<String, dynamic>) {
-      destinationError = DestinationError(
-        code: rawError['code'] as String? ?? '',
-        message: rawError['message'] as String? ?? '',
-      );
-    }
+    final destinationError =
+        rawError is Map ? DestinationError.fromJson(rawError) : null;
 
     return RoutingResult(
       source: source,
@@ -378,12 +415,12 @@ final class RoutingResult {
           source == other.source &&
           id == other.id &&
           destinationBaseAccount == other.destinationBaseAccount &&
-          destinationError?.code == other.destinationError?.code &&
+          destinationError == other.destinationError &&
           _listEquals(warnings, other.warnings);
 
   @override
   int get hashCode => Object.hash(source, id, destinationBaseAccount,
-      destinationError?.code, Object.hashAll(warnings));
+      destinationError, Object.hashAll(warnings));
 
   static bool _listEquals(List<RoutingWarning> a, List<RoutingWarning> b) {
     if (a.length != b.length) return false;

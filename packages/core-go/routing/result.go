@@ -1,6 +1,8 @@
 package routing
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,4 +101,142 @@ func (r *RoutingID) IsZero() bool {
 
 func NewRoutingID(s string) *RoutingID {
 	return &RoutingID{raw: s}
+}
+
+// RoutingResult is the outcome of a routing decision. It is safe to cache in
+// Redis/BoltDB or send over gRPC via its JSON and binary marshalers.
+type RoutingResult struct {
+	ID       *RoutingID
+	MemoType MemoType
+	Memo     string
+}
+
+// MarshalJSON encodes the result as a JSON object. A nil ID is encoded as
+// null; MemoType and Memo are always present.
+func (r RoutingResult) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ID       *RoutingID `json:"id"`
+		MemoType MemoType   `json:"memoType"`
+		Memo     string     `json:"memo"`
+	}{
+		ID:       r.ID,
+		MemoType: r.MemoType,
+		Memo:     r.Memo,
+	})
+}
+
+// UnmarshalJSON decodes a JSON object produced by MarshalJSON.
+func (r *RoutingResult) UnmarshalJSON(data []byte) error {
+	if r == nil {
+		return fmt.Errorf("routing result: UnmarshalJSON on nil receiver")
+	}
+
+	var v struct {
+		ID       *RoutingID `json:"id"`
+		MemoType MemoType   `json:"memoType"`
+		Memo     string     `json:"memo"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return fmt.Errorf("routing result: invalid JSON: %w", err)
+	}
+
+	r.ID = v.ID
+	r.MemoType = v.MemoType
+	r.Memo = v.Memo
+	return nil
+}
+
+// MarshalBinary encodes the result into a compact, length-prefixed binary
+// form suitable for caching. Layout:
+//
+//	[1 byte flags][2 byte memoType len][memoType][4 byte memo len][memo][8 byte id]
+//
+// The ID is only present when the flag bit is set.
+func (r RoutingResult) MarshalBinary() ([]byte, error) {
+	var buf bytes.Buffer
+
+	var flags byte
+	if !r.ID.IsZero() {
+		flags |= 1
+	}
+	buf.WriteByte(flags)
+
+	if err := writeString(&buf, string(r.MemoType)); err != nil {
+		return nil, err
+	}
+	if err := writeString(&buf, r.Memo); err != nil {
+		return nil, err
+	}
+
+	if flags&1 != 0 {
+		id, err := r.ID.Uint64()
+		if err != nil {
+			return nil, fmt.Errorf("routing result: invalid id: %w", err)
+		}
+		if err := binary.Write(&buf, binary.BigEndian, id); err != nil {
+			return nil, fmt.Errorf("routing result: write id: %w", err)
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// UnmarshalBinary decodes data produced by MarshalBinary.
+func (r *RoutingResult) UnmarshalBinary(data []byte) error {
+	if r == nil {
+		return fmt.Errorf("routing result: UnmarshalBinary on nil receiver")
+	}
+
+	buf := bytes.NewReader(data)
+
+	flags, err := buf.ReadByte()
+	if err != nil {
+		return fmt.Errorf("routing result: read flags: %w", err)
+	}
+
+	memoType, err := readString(buf)
+	if err != nil {
+		return err
+	}
+	memo, err := readString(buf)
+	if err != nil {
+		return err
+	}
+
+	var id *RoutingID
+	if flags&1 != 0 {
+		var raw uint64
+		if err := binary.Read(buf, binary.BigEndian, &raw); err != nil {
+			return fmt.Errorf("routing result: read id: %w", err)
+		}
+		id = NewRoutingID(strconv.FormatUint(raw, 10))
+	}
+
+	r.ID = id
+	r.MemoType = MemoType(memoType)
+	r.Memo = memo
+	return nil
+}
+
+func writeString(buf *bytes.Buffer, s string) error {
+	if len(s) > 0xffff {
+		return fmt.Errorf("routing result: string too long: %d", len(s))
+	}
+	if err := binary.Write(buf, binary.BigEndian, uint16(len(s))); err != nil {
+		return fmt.Errorf("routing result: write length: %w", err)
+	}
+	buf.WriteString(s)
+	return nil
+}
+
+func readString(buf *bytes.Reader) (string, error) {
+	var n uint16
+	if err := binary.Read(buf, binary.BigEndian, &n); err != nil {
+		return "", fmt.Errorf("routing result: read length: %w", err)
+	}
+	b := make([]byte, n)
+	if _, err := buf.Read(b); err != nil {
+		return "", fmt.Errorf("routing result: read string: %w", err)
+	}
+	return string(b), nil
 }

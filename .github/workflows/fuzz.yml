@@ -4,13 +4,16 @@ on:
   push:
     branches: ["main"]
   pull_request:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
 
 jobs:
   fuzz:
     name: Run rust-address-fuzzer
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -22,10 +25,26 @@ jobs:
 
       - name: Upload Reproducer
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: fuzzer-findings
           path: examples/rust-address-fuzzer/findings/
+
+      - name: Notify Slack / Discord on Failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg text "🚨 *Nightly Fuzzing Failure* in \`${{ github.repository }}\` (job: \`rust-address-fuzzer\`, ref: \`${{ github.ref_name }}\`) — <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>" \
+            '{text: $text, content: $text}')
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" || true
+          fi
+          if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+            curl -sS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$DISCORD_WEBHOOK_URL" || true
+          fi
 
   differential:
     name: Differential detect/parse (TS vs Go vs Dart)
@@ -34,15 +53,15 @@ jobs:
     # reported and uploaded without blocking the PR.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 8
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "pnpm"
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
       - uses: dart-lang/setup-dart@v1
@@ -52,7 +71,7 @@ jobs:
 
       - name: Upload mismatch log
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: differential-mismatches
           path: examples/rust-address-fuzzer/findings/differential-mismatches.jsonl

@@ -40,6 +40,9 @@ export function normalizeMemoTextId(s: string): NormalizeResult {
   }
 
   // Validate that normalized contains only decimal digits before BigInt conversion
+  // Unreachable today (`s` was checked above and only zeros were stripped);
+  // kept as a guard in case that check changes. Excluded from coverage.
+  /* v8 ignore next 3 */
   if (!/^\d+$/.test(normalized)) {
     return { normalized: null, warnings };
   }
@@ -49,9 +52,12 @@ export function normalizeMemoTextId(s: string): NormalizeResult {
     if (val > UINT64_MAX) {
       return { normalized: null, warnings };
     }
+    /* v8 ignore start */
   } catch {
+    // BigInt() cannot throw on a digits-only string.
     return { normalized: null, warnings };
   }
+  /* v8 ignore stop */
 
   return { normalized, warnings };
 }

@@ -34,7 +34,8 @@ ParseResult parse(String input) {
   }
 
   final warnings = <Warning>[];
-  if (input != input.toUpperCase()) {
+  final normalized = input.trim().toUpperCase();
+  if (input != normalized) {
     warnings.add(
       Warning(
         code: WarningCode.nonCanonicalAddress,
@@ -42,7 +43,7 @@ ParseResult parse(String input) {
         message: 'Address normalized to uppercase',
         normalization: Normalization(
           original: input,
-          normalized: input.toUpperCase(),
+          normalized: normalized,
         ),
       ),
     );
@@ -50,7 +51,7 @@ ParseResult parse(String input) {
 
   return ParseResult(
     kind: kind,
-    address: input.toUpperCase(),
+    address: normalized,
     warnings: warnings,
   );
 }

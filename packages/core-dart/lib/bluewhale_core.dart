@@ -50,6 +50,7 @@ export 'src/routing/memo.dart' hide uint64Max, digitsOnly;
 export 'src/routing/routing_result.dart';
 export 'src/routing/safe_routing_id.dart';
 export 'src/routing/severity.dart';
+export 'src/routing/tx.dart';
 export 'src/routing/uri.dart';
 export 'src/exceptions.dart';
 
